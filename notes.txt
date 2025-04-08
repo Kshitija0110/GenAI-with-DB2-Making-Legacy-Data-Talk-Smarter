@@ -1,0 +1,23 @@
+To compile use:javac -cp ".;C:\Program Files\IBM\SQLLIB\java\db2jcc4.jar" HospitalDbCreator.java
+javac -cp ".;C:\Program Files\IBM\SQLLIB\java\db2jcc4.jar" HospitalDataViewer.java
+To run use:java -cp ".;C:\Program Files\IBM\SQLLIB\java\db2jcc4.jar" HospitalDbCreator
+
+On db2 server(running as administrator)
+type db2
+list db directory
+connect to USER
+db2 get dbm cfg | findstr "AUTHENTICATION"
+type C:\Windows\System32\drivers\etc\services | findstr db2c_DB2->to get port
+
+
+To run use:
+# Create directories
+mkdir -p target/dependency
+
+# Download JSON library 
+Invoke-WebRequest -Uri "https://repo1.maven.org/maven2/org/json/json/20231013/json-20231013.jar" -OutFile "target/dependency/json-20231013.jar"
+java -cp "target/classes;lib/db2jcc4.jar;target/dependency/json-20231013.jar" NaturalLanguageQueryExecutor
+
+Then for gui run:
+mvn clean package
+java -jar target/db2-movie-recommender-1.0-SNAPSHOT-jar-with-dependencies.jar
