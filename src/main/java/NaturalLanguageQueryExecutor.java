@@ -13,6 +13,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Properties;
 import java.util.Scanner;
+import java.util.StringJoiner;
 
 import org.json.JSONObject;
 
@@ -25,7 +26,7 @@ public class NaturalLanguageQueryExecutor {
     private static final String HF_API_ENDPOINT = "https://kshitu-genai.hf.space/get_answer";
     
     // Schema information to include in prompts
-    private static final String SCHEMA_INFO = 
+    private static final String BASE_SCHEMA_INFO = 
         "You are a DB2 SQL expert. Convert the following question to a valid DB2 SQL query for the INVENTORY table.\n\n" +
         "IMPORTANT: Return the SQL query as a single line without any line breaks or newlines.\n\n" +
         "Table schema:\n" +
@@ -45,6 +46,91 @@ public class NaturalLanguageQueryExecutor {
         "Products include: Laptops, Smartphones, T-shirts, Washing Machines, Headphones, Sneakers, Refrigerators, etc.\n\n" +
         "Return ONLY a valid DB2 SQL query without any explanation. Question: ";
     
+    private String SCHEMA_INFO;
+
+     public NaturalLanguageQueryExecutor() {
+        // Initialize with base schema info
+        this.SCHEMA_INFO = BASE_SCHEMA_INFO;
+        
+        // Attempt to fetch and add actual data
+        try {
+            this.SCHEMA_INFO += fetchActualInventoryData();
+        } catch (Exception e) {
+            System.err.println("Warning: Could not fetch actual inventory data: " + e.getMessage());
+            // Use fallback static data if we couldn't fetch actual data
+            this.SCHEMA_INFO += 
+                "The table contains categories: 'Electronics', 'Clothing', 'Home Appliances', 'Footwear', 'Beauty', 'Kitchen Appliances'.\n" +
+                "Products include: Laptops, Smartphones, T-shirts, Washing Machines, Headphones, Sneakers, Refrigerators, etc.\n\n";
+        }
+        
+        // Append final instruction
+        this.SCHEMA_INFO += "Return ONLY a valid DB2 SQL query without any explanation. Question: ";
+    }
+
+    private String fetchActualInventoryData() {
+        StringBuilder dataInfo = new StringBuilder();
+        dataInfo.append("Current inventory data (all records):\n```\n");
+        
+        Connection connection = null;
+        Statement statement = null;
+        ResultSet resultSet = null;
+        
+        try {
+            // Load the DB2 JDBC driver and establish connection
+            Class.forName("com.ibm.db2.jcc.DB2Driver");
+            
+            // Setup connection properties
+            Properties props = new Properties();
+            props.setProperty("user", "DELL");
+            props.setProperty("password", "Kshitu@2211");
+            
+            connection = DriverManager.getConnection(JDBC_URL, props);
+            statement = connection.createStatement();
+            
+            // Query to get all inventory data
+            resultSet = statement.executeQuery("SELECT * FROM INVENTORY ORDER BY ID");
+            
+            // Get metadata for column names
+            ResultSetMetaData metaData = resultSet.getMetaData();
+            int columnCount = metaData.getColumnCount();
+            
+            // Format column headers
+            StringJoiner header = new StringJoiner(" | ");
+            for (int i = 1; i <= columnCount; i++) {
+                header.add(metaData.getColumnName(i));
+            }
+            dataInfo.append(header.toString()).append("\n");
+            
+            // Add separator line
+            dataInfo.append("-".repeat(header.toString().length())).append("\n");
+            
+            // Format data rows
+            while (resultSet.next()) {
+                StringJoiner row = new StringJoiner(" | ");
+                for (int i = 1; i <= columnCount; i++) {
+                    String value = resultSet.getString(i);
+                    row.add(value == null ? "NULL" : value);
+                }
+                dataInfo.append(row.toString()).append("\n");
+            }
+            
+            dataInfo.append("```\n\n");
+            return dataInfo.toString();
+            
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to fetch inventory data: " + e.getMessage(), e);
+        } finally {
+            // Close resources
+            try {
+                if (resultSet != null) resultSet.close();
+                if (statement != null) statement.close();
+                if (connection != null) connection.close();
+            } catch (SQLException e) {
+                System.err.println("Failed to close database resources: " + e.getMessage());
+            }
+        }
+    }
+
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
         Connection connection = null;
